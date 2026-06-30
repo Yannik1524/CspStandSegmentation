@@ -121,9 +121,29 @@ add_branch <- function(cylinder, max_length = 2, max_radius = 0.05, max_points =
   return(cylinder)
 }
 
+simulate_occlusion <- function(cylinder, occlusion_prob = 0.5, occlusion_angular_radius = 1, x = 0, y = 0){
+  if(runif(1) > occlusion_prob) return(cylinder)
+  # select a random point on the cylinder
+  idx <- sample(1:nrow(cylinder), 1)
+  occlusion_center <- as.numeric(cylinder[idx, ])
+  
+  # calculate angles from the center of the cylinder to the occlusion center
+  center <- c(x, y)
+  occlusion_angles <- atan2(occlusion_center[2] - center[2], occlusion_center[1] - center[1])
+
+  #calculate angles for all points from center
+  angles <- atan2(cylinder$y - center[2], cylinder$x - center[1])
+  # calculate angular distance from occlusion center to all points
+  angular_dists <- abs(angles - occlusion_angles)
+  angular_dists <- pmin(angular_dists, 2 * pi - angular_dists) # wrap around
+
+  # remove points within the occlusion radius
+  cylinder <- cylinder[angular_dists > occlusion_angular_radius, ]
+  return(cylinder)
+}
 
 set.seed(10)
-cyl <- random_circle() |> add_outside_noise(0.02) |> circle2cylinder(0, 1) |> add_branch()  |> rotate_cylinder(0.1) ; cyl[,1:2] |> plot(asp = 1) #|> add_scene_noise(1000, 0.5, 1.5, prob = 0.5)
+cyl <- random_circle() |> add_outside_noise(0.02) |> circle2cylinder(0, 1) |> simulate_occlusion() |> add_branch()  |> rotate_cylinder(0.1) ; cyl[,1:2] |> plot(asp = 1) #|> add_scene_noise(1000, 0.5, 1.5, prob = 0.5)
 
 set.seed(10)
 random_circle() |> add_outside_noise(0.02) |> add_scene_noise(1000, 0.5, 1.5, prob = 0.5) |> conicfit::CircleFitByPratt()
