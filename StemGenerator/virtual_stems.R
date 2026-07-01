@@ -150,8 +150,66 @@ simulate_occlusion <- function(cylinder, occlusion_prob = 0.5, occlusion_angular
   return(cylinder)
 }
 
-set.seed(10)
-cylinder <- random_circle() |> add_outside_noise(0.02) |> circle2cylinder(0, 1) |> simulate_occlusion() |> add_branch()  |> rotate_cylinder(0.1) ; cylinder[,1:2] |> plot(asp = 1) #|> add_scene_noise(1000, 0.5, 1.5, prob = 0.5)
+simulate_registration_error <- function(cylinder, x = 0, y = 0, max_offset = 0.1, offset_prob = 0.5){
+  if(runif(1) > offset_prob) return(cylinder)
+  
+  offset_angular_radius <- runif(1, 0, pi/2)
 
-set.seed(10)
-random_circle() |> add_outside_noise(0.02) |> add_scene_noise(1000, 0.5, 1.5, prob = 0.5) |> conicfit::CircleFitByPratt()
+  # random x and y offset 
+  x_off <- runif(1,0,max_offset)
+  y_off <- runif(1,0,max_offset)
+
+  # select a random point on the cylinder
+  idx <- sample(1:nrow(cylinder), 1)
+  offset_center <- as.numeric(cylinder[idx, ])
+  offset_angle <- atan2(offset_center[2] - center[2], offset_center[1] - center[1])
+  # calculate angles from the center of the cylinder to the offset center
+  center <- c(x, y)
+
+  #calculate angles for all points from center
+  angles <- atan2(cylinder$y - center[2], cylinder$x - center[1])
+  
+  # calculate angular distance from offset center to all points
+  angular_dists <- abs(angles - offset_angle)
+  angular_dists <- pmin(angular_dists, 2 * pi - angular_dists) # wrap around
+
+  # invert angular distance to get offset probability
+  offset_probs <- (1 - (angular_dists / offset_angular_radius))^2
+  offset_idx <- sample(1:nrow(cylinder), round(nrow(cylinder) * (offset_angular_radius / (2 * pi))), prob = offset_probs)
+  cylinder[offset_idx, "x"] <- cylinder[offset_idx, "x"] + x_off
+  cylinder[offset_idx, "y"] <- cylinder[offset_idx, "y"] + y_off
+  return(cylinder)
+}
+
+# set.seed(10)
+# cylinder <- random_circle() |> add_outside_noise(0.02) |> circle2cylinder(0, 1) |> simulate_occlusion() |> add_branch()  |> rotate_cylinder(0.1) ; cylinder[,1:2] |> plot(asp = 1) #|> add_scene_noise(1000, 0.5, 1.5, prob = 0.5)
+
+# set.seed(10)
+# random_circle() |> add_outside_noise(0.02) |> add_scene_noise(1000, 0.5, 1.5, prob = 0.5) |> conicfit::CircleFitByPratt()
+trunk_generator <- function(x_range = c(-0.5, 0.5), 
+                            y_range = c(-0.5, 0.5), 
+                            z_range = c(0, 1), 
+                            r_range = c(0.02, 1.1), 
+                            n_points_range = c(80, 1000), 
+                            noise_sd = 0.01,
+                            noise_prob = 0.5,
+                            max_rotation_angle = 0.1, 
+                            max_branch_length = 2, 
+                            occlusion_prob = 0.5, 
+                            occlusion_angular_radius_range = c(90,180), 
+                            offset_prob = 0.5, 
+                            max_offset = 0.1){
+  # generate a random trunk
+  x <- runif(1, x_range[1], x_range[2])
+  y <- runif(1, y_range[1], y_range[2])
+  r <- runif(1, r_range[1], r_range[2])
+  n_points <- round(runif(1, n_points_range[1], n_points_range[2]))
+  cylinder <- random_circle(x = x, y = y, r = r, n = n_points) |> 
+    add_outside_noise(noise_sd) |> 
+    circle2cylinder(z_range[1], z_range[2]) |> 
+    simulate_occlusion(occlusion_prob = occlusion_prob, occlusion_angular_radius = round(runif(1, occlusion_angular_radius_range[1], occlusion_angular_radius_range[2]))) |> 
+    add_branch(max_branch_length = max_branch_length)  |> 
+    rotate_cylinder(max_angle = max_rotation_angle) |> 
+    add_scene_noise(round(n_points*0.5), max_distance = 1.5, prob = noise_prob, x = x, y = y, r = r) # maximum 50% noise points
+  list(cylinder = cylinder, x = x, y = y, r = r) |> return()
+}
