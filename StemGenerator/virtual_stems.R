@@ -6,6 +6,9 @@ random_circle <- function(x = 0, y = 0, r = 0.2, theta = 0.05, n = 1000){
   shape <- data.frame(x = shape[,1], y = shape[,2])
   angles <- atan2(shape$y - y, shape$x - x)
   dists <- sqrt((shape$x - x)^2 + (shape$y - y)^2)
+  new_r <- mean(dists)
+  new_x <- mean(shape$x)
+  new_y <- mean(shape$y)
   # sort by angle
   shape <- shape[order(angles), ]
   spline <- mgcv::gam(dists ~ s(angles, bs = "cc", k = 8), knots = list(angles = c(-pi, pi)))
@@ -15,7 +18,9 @@ random_circle <- function(x = 0, y = 0, r = 0.2, theta = 0.05, n = 1000){
   # convert back to cartesian
   fc_x <- x + fc_dists * cos(fc_angles)
   fc_y <- y + fc_dists * sin(fc_angles)
-  return(data.frame(x = fc_x, y = fc_y))
+  circle <- data.frame(x = fc_x, y = fc_y)
+  circle_list <- list(circle = circle, x = new_x, y = new_y, r = new_r)
+  return(circle_list)
 }
 
 circle2cylinder <- function(circle, zmin, zmax){
@@ -192,24 +197,39 @@ trunk_generator <- function(x_range = c(-0.5, 0.5),
                             r_range = c(0.02, 1.1), 
                             n_points_range = c(80, 1000), 
                             noise_sd = 0.01,
+                            scene_noise_sd = 2,
                             noise_prob = 0.5,
                             max_rotation_angle = 0.1, 
                             max_branch_length = 2, 
                             occlusion_prob = 0.5, 
                             occlusion_angular_radius_range = c(90,180), 
                             offset_prob = 0.5, 
-                            max_offset = 0.1){
+                            max_offset = 0.1,
+                            plot_trunk = FALSE){
   # generate a random trunk
   x <- runif(1, x_range[1], x_range[2])
   y <- runif(1, y_range[1], y_range[2])
   r <- runif(1, r_range[1], r_range[2])
   n_points <- round(runif(1, n_points_range[1], n_points_range[2]))
-  cylinder <- random_circle(x = x, y = y, r = r, n = n_points) |> 
+  circle <- random_circle(x = x, y = y, r = r, n = n_points)
+  x <- circle$x
+  y <- circle$y
+  r <- circle$r
+  cylinder <- circle$circle |> 
     add_outside_noise(noise_sd) |> 
     circle2cylinder(z_range[1], z_range[2]) |> 
     simulate_occlusion(occlusion_prob = occlusion_prob, occlusion_angular_radius = round(runif(1, occlusion_angular_radius_range[1], occlusion_angular_radius_range[2]))) |> 
-    add_branch(max_branch_length = max_branch_length)  |> 
+    add_branch(max_length = max_branch_length)  |> 
     rotate_cylinder(max_angle = max_rotation_angle) |> 
-    add_scene_noise(round(n_points*0.5), max_distance = 1.5, prob = noise_prob, x = x, y = y, r = r) # maximum 50% noise points
-  list(cylinder = cylinder, x = x, y = y, r = r) |> return()
+    add_scene_noise(round(n_points*0.5), sd = scene_noise_sd, max_distance = 1.5, prob = noise_prob, x = x, y = y, r = r) # maximum 50% noise points
+  trunk_list <- list(cylinder = cylinder, x = x, y = y, r = r)
+  if(plot_trunk){
+    plot(cylinder[,1:2], asp = 1, pch = 20, cex = 0.5, col = rgb(0,0,0,0.5), main = "Trunk Point Cloud")
+    points(x, y, pch = 4, col = "red", cex = 2)
+    symbols(x, y, circles = r, add = TRUE, inches = FALSE, lwd = 2, fg = "blue")
+  }
+  return(trunk_list)
 }
+
+trunk_generator(plot_trunk = TRUE)
+
