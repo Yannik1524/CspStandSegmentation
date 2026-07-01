@@ -225,9 +225,10 @@ trunk_generator <- function(x_range = c(-0.5, 0.5),
     add_outside_noise(noise_sd) |> 
     circle2cylinder(z_range[1], z_range[2]) |> 
     simulate_occlusion(occlusion_prob = occlusion_prob, occlusion_angular_radius = round(runif(1, occlusion_angular_radius_range[1], occlusion_angular_radius_range[2]))) |> 
-    add_branch(max_length = max_branch_length, max_points = round(n_points * 0.3))  |> 
-    rotate_cylinder(max_angle = max_rotation_angle, x = x, y = y, z = mean(z_range)) #|> 
-    #add_scene_noise(round(n_points*0.5), sd = scene_noise_sd, max_distance = 1.5, prob = noise_prob, x = x, y = y, r = r) # maximum 50% noise points
+    add_branch(max_length = max_branch_length, max_points = round(n_points * 0.3))  |> # maximum 30% branch points
+    simulate_registration_error(x = x, y = y, max_offset = max_offset, offset_prob = offset_prob) |>
+    rotate_cylinder(max_angle = max_rotation_angle, x = x, y = y, z = mean(z_range)) |> 
+    add_scene_noise(round(n_points*0.5), sd = scene_noise_sd, max_distance = 1.5, prob = noise_prob, x = x, y = y, r = r) # maximum 50% noise points
   trunk_list <- list(cylinder = cylinder, x = x, y = y, r = r)
   if(plot_trunk){
     plot(cylinder[,1:2], asp = 1, pch = 20, cex = 0.5, col = rgb(0,0,0,0.5), main = paste("Trunk Point Cloud", "n =", nrow(cylinder), "r =", round(r, 3), "x =", round(x, 3), "y =", round(y, 3)))
