@@ -56,12 +56,15 @@ add_scene_noise <- function(cylinder, n, sd, max_distance = 2, prob = 0.5,x = 0,
   return(noise)
 }
 
-rotate_cylinder <- function(cylinder, max_angle = 0){
+rotate_cylinder <- function(cylinder, max_angle = 0, x = 0, y = 0, z = 0){
   ax <- runif(1, -max_angle, max_angle)
   ay <- runif(1, -max_angle, max_angle)
 
-  center <- colMeans(cylinder[, c("x", "y", "z")])
-  xyz <- as.matrix(cylinder[, c("x", "y", "z")]) - center
+  center <- c(x, y, z)
+  xyz <- as.matrix(cylinder[, c("x", "y", "z")])
+  xyz[,1] <- xyz[,1] - center[1]
+  xyz[,2] <- xyz[,2] - center[2]
+  xyz[,3] <- xyz[,3] - center[3]
 
   Rx <- matrix(c(
     1, 0, 0,
@@ -75,9 +78,11 @@ rotate_cylinder <- function(cylinder, max_angle = 0){
     -sin(ay), 0, cos(ay)
   ), nrow = 3, byrow = TRUE)
 
-  rotated <- xyz %*% t(Ry %*% Rx) + center
-
-  data.frame(x = rotated[, 1], y = rotated[, 2], z = rotated[, 3])
+  rotated <- xyz %*% t(Ry %*% Rx)
+  rotated[,1] <- rotated[,1] + center[1]
+  rotated[,2] <- rotated[,2] + center[2]
+  rotated[,3] <- rotated[,3] + center[3]
+  return(data.frame(x = rotated[, 1], y = rotated[, 2], z = rotated[, 3]))
 }
 
 # function to create a branch as a random walk of points in 3d space starting from a random 
@@ -165,9 +170,10 @@ simulate_registration_error <- function(cylinder, x = 0, y = 0, max_offset = 0.1
   y_off <- runif(1,0,max_offset)
 
   # select a random point on the cylinder
-  idx <- sample(1:nrow(cylinder), 1)
-  offset_center <- as.numeric(cylinder[idx, ])
-  offset_angle <- atan2(offset_center[2] - center[2], offset_center[1] - center[1])
+  # idx <- sample(1:nrow(cylinder), 1)
+  # offset_center <- as.numeric(cylinder[idx, ])
+  # offset_angle <- atan2(offset_center[2] - center[2], offset_center[1] - center[1])
+  offset_angle <- runif(1, -pi, pi)
   # calculate angles from the center of the cylinder to the offset center
   center <- c(x, y)
 
@@ -219,17 +225,18 @@ trunk_generator <- function(x_range = c(-0.5, 0.5),
     add_outside_noise(noise_sd) |> 
     circle2cylinder(z_range[1], z_range[2]) |> 
     simulate_occlusion(occlusion_prob = occlusion_prob, occlusion_angular_radius = round(runif(1, occlusion_angular_radius_range[1], occlusion_angular_radius_range[2]))) |> 
-    add_branch(max_length = max_branch_length)  |> 
-    rotate_cylinder(max_angle = max_rotation_angle) |> 
-    add_scene_noise(round(n_points*0.5), sd = scene_noise_sd, max_distance = 1.5, prob = noise_prob, x = x, y = y, r = r) # maximum 50% noise points
+    add_branch(max_length = max_branch_length, max_points = round(n_points * 0.3))  |> 
+    rotate_cylinder(max_angle = max_rotation_angle, x = x, y = y, z = mean(z_range)) #|> 
+    #add_scene_noise(round(n_points*0.5), sd = scene_noise_sd, max_distance = 1.5, prob = noise_prob, x = x, y = y, r = r) # maximum 50% noise points
   trunk_list <- list(cylinder = cylinder, x = x, y = y, r = r)
   if(plot_trunk){
-    plot(cylinder[,1:2], asp = 1, pch = 20, cex = 0.5, col = rgb(0,0,0,0.5), main = "Trunk Point Cloud")
+    plot(cylinder[,1:2], asp = 1, pch = 20, cex = 0.5, col = rgb(0,0,0,0.5), main = paste("Trunk Point Cloud", "n =", nrow(cylinder), "r =", round(r, 3), "x =", round(x, 3), "y =", round(y, 3)))
     points(x, y, pch = 4, col = "red", cex = 2)
     symbols(x, y, circles = r, add = TRUE, inches = FALSE, lwd = 2, fg = "blue")
   }
   return(trunk_list)
 }
 
-trunk_generator(plot_trunk = TRUE)
+set.seed(10)
+cyl <- trunk_generator(x_range = c(10,100), y_range = c(20,50), plot_trunk = TRUE)
 
